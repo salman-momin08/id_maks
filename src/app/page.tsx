@@ -3,7 +3,7 @@
 import { useState, useRef, type ChangeEvent } from 'react';
 import Image from 'next/image';
 import { detectPii, type DetectPiiOutput } from '@/ai/flows/detect-pii';
-import { maskPII } from '@/ai/flows/mask-pii';
+import { redactAadhaar } from '@/ai/flows/redact-aadhaar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -47,23 +47,23 @@ export default function Home() {
     setMaskedImage(null);
     setPiiDetections([]);
     try {
-      // Run detection and masking in parallel
-      const [piiResult, maskedResult] = await Promise.all([
+      // Run detection and redaction
+      const [piiResult, redactedResult] = await Promise.all([
         detectPii({ photoDataUri: dataUri }),
-        maskPII({ photoDataUri: dataUri }),
+        redactAadhaar({ photoDataUri: dataUri }),
       ]);
 
       if (piiResult?.piiElements) {
         setPiiDetections(piiResult.piiElements);
       }
-      if (maskedResult?.maskedPhotoDataUri) {
-        setMaskedImage(maskedResult.maskedPhotoDataUri);
+      if (redactedResult?.redactedPhotoDataUri) {
+        setMaskedImage(redactedResult.redactedPhotoDataUri);
       }
     } catch (error) {
       console.error('Error processing image:', error);
       toast({
         title: 'Processing Error',
-        description: 'Failed to detect or mask PII. Please try again.',
+        description: 'Failed to redact PII. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -75,7 +75,7 @@ export default function Home() {
     if (!maskedImage) return;
     const link = document.createElement('a');
     link.href = maskedImage;
-    link.download = 'masked-image.png';
+    link.download = 'redacted-aadhaar.png';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -141,29 +141,29 @@ export default function Home() {
               <div className="space-y-8">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Masked Image</CardTitle>
-                    <CardDescription>Sensitive information has been redacted.</CardDescription>
+                    <CardTitle>Redacted Image</CardTitle>
+                    <CardDescription>Sensitive information has been blurred or replaced.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {isLoading && (
                        <div className="aspect-video w-full flex flex-col items-center justify-center bg-muted/50 rounded-lg">
                          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4"/>
-                         <p className="text-muted-foreground">Scanning and masking PII...</p>
+                         <p className="text-muted-foreground">Scanning and redacting PII...</p>
                        </div>
                     )}
                     {!isLoading && maskedImage && (
                       <Image
                         src={maskedImage}
-                        alt="Masked document"
+                        alt="Redacted document"
                         width={800}
                         height={600}
                         className="w-full h-auto rounded-lg border"
-                        data-ai-hint="document id"
+                        data-ai-hint="document id redacted"
                       />
                     )}
                      {!isLoading && !maskedImage && (
                        <div className="aspect-video w-full flex items-center justify-center bg-destructive/10 text-destructive rounded-lg">
-                         <p>Could not generate masked image.</p>
+                         <p>Could not generate redacted image.</p>
                        </div>
                     )}
                   </CardContent>
@@ -171,7 +171,7 @@ export default function Home() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Detected Information</CardTitle>
-                    <CardDescription>The following PII types were found and masked.</CardDescription>
+                    <CardDescription>The following PII types were found.</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {isLoading && <p className="text-muted-foreground">Detecting PII...</p>}
@@ -201,7 +201,7 @@ export default function Home() {
                 ) : (
                   <Download className="mr-2"/>
                 )}
-                Download Masked Image
+                Download Redacted Image
               </Button>
             </div>
           </div>

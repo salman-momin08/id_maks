@@ -2,9 +2,9 @@
 'use server';
 
 /**
- * @fileOverview Detects and masks Personally Identifiable Information (PII) from an image.
+ * @fileOverview Detects Personally Identifiable Information (PII) from a document image.
  *
- * - detectPii - A function that handles the PII detection and masking process.
+ * - detectPii - A function that handles the PII detection process.
  * - DetectPiiInput - The input type for the detectPii function.
  * - DetectPiiOutput - The return type for the detectPii function.
  */
@@ -22,18 +22,18 @@ const DetectPiiInputSchema = z.object({
 export type DetectPiiInput = z.infer<typeof DetectPiiInputSchema>;
 
 const PiiDetectionResultSchema = z.object({
-  type: z.string().describe('The type of PII detected (e.g., Full Name, Address, Date of Birth, Aadhaar Number, Phone Number, Email).'),
-  value: z.string().describe('The detected PII value.'),
+  type: z.string().describe('The type of PII detected (e.g., Name, Year of Birth, Gender, Aadhaar Number, Photo, Email).'),
+  value: z.string().describe('The detected PII value. For Aadhaar, only the first 8 digits. For Photo, this can be "face".'),
   bounding_box: z.object({
     x1: z.number(),
     y1: z.number(),
     x2: z.number(),
     y2: z.number(),
-  }).optional().describe('The bounding box coordinates of the detected PII in the image. Optional because not all PII types might have a clear bounding box.'),
+  }).describe('The bounding box coordinates of the detected PII in the image.'),
 });
 
 const DetectPiiOutputSchema = z.object({
-  piiElements: z.array(PiiDetectionResultSchema).describe('An array of detected PII elements with their types, values, and bounding box coordinates (if available).'),
+  piiElements: z.array(PiiDetectionResultSchema).describe('An array of detected PII elements with their types, values, and bounding box coordinates.'),
 });
 
 export type DetectPiiOutput = z.infer<typeof DetectPiiOutputSchema>;
@@ -47,26 +47,23 @@ const detectPiiPrompt = ai.definePrompt({
   name: 'detectPiiPrompt',
   input: {schema: DetectPiiInputSchema},
   output: {schema: DetectPiiOutputSchema},
-  prompt: `You are a highly specialized data protection officer with expertise in Optical Character Recognition (OCR) and Personally Identifiable Information (PII) detection from document images.
+  prompt: `You are a highly specialized data protection officer with expertise in Optical Character Recognition (OCR) and Personally Identifiable Information (PII) detection from document images, specifically Indian Aadhaar cards.
 
   Your task is to meticulously analyze the provided document image and identify the following specific PII types:
-  - Full Name
-  - Address
-  - Date of Birth
+  - Name
+  - Year of Birth
+  - Gender
   - Aadhaar Number
-  - Phone Number
-  - Email
+  - Photo (the main portrait of the person)
 
   For each piece of PII you find:
   1.  Extract the exact text value.
   2.  Identify its type from the list above.
   3.  Determine the precise bounding box coordinates (x1, y1, x2, y2) that enclose the PII on the image.
 
-  **CRITICAL INSTRUCTIONS for Aadhaar Numbers:**
-  - An Aadhaar number is a 12-digit number, often formatted as XXXX XXXX XXXX.
-  - When you detect an Aadhaar Number, you MUST identify ONLY THE FIRST 8 DIGITS as the PII to be redacted.
-  - The 'value' field in your output for an Aadhaar Number MUST contain ONLY the first 8 digits.
-  - The 'bounding_box' for the Aadhaar Number MUST ONLY cover the area of these first 8 digits. The last 4 digits must be excluded from the bounding box and value. This is a strict requirement.
+  **CRITICAL INSTRUCTIONS for specific fields:**
+  - **Aadhaar Number**: An Aadhaar number is a 12-digit number, often formatted as XXXX XXXX XXXX. When you detect it, you MUST identify ONLY THE FIRST 8 DIGITS as the PII to be redacted. The 'value' field in your output for an Aadhaar Number MUST contain ONLY the first 8 digits. The 'bounding_box' MUST ONLY cover the area of these first 8 digits.
+  - **Photo**: Identify the main portrait photo on the card. The 'value' can be "face" or "photo". The 'bounding_box' must enclose the entire photo area.
 
   Return your findings as a structured JSON array according to the output schema. If no PII is found, return an empty array.
 

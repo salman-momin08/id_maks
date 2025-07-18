@@ -54,14 +54,21 @@ const maskPIIFlow = ai.defineFlow(
         .join('\n');
 
     const prompt = `
-You are an expert document editor with perfect accuracy. Your task is to edit the provided image to redact Personally Identifiable Information (PII) by replacing it with 'X' characters.
+You are an expert document editor with perfect accuracy. Your task is to edit the provided image to redact Personally Identifiable Information (PII) by replacing it with styled placeholder text.
 
 **Instructions:**
 1.  Analyze the user-provided image carefully.
 2.  For each piece of PII listed below, locate the exact text within its specified bounding box.
-3.  **Replace the original text with a sequence of 'X's.** For example, a name like "John Doe" should become "XXXX XXX" and a number like "1234 5678 9012" should become "XXXX XXXX XXXX". Match the character count and spacing of the original text as closely as possible.
-4.  The replacement text should be in a standard, clean, black font that blends with the document.
-5.  **Crucially, you must not alter any other part of the image.** The background, surrounding text, and document quality must remain identical to the original. The final image must be a perfect, high-quality copy with only the specified text replaced.
+3.  Replace the original text with a sequence of 'X's. **You must match the character count and spacing of the original text.** For example, a name like "Salman Khan" should become "XXXXXX XXXX" and a number like "2345 6789 1234" should become "XXXX XXXX XXXX".
+4.  The replacement 'X' text MUST be styled according to these rules:
+    - **Font Family**: 'Inter', 'Arial', sans-serif (a clean, neutral sans-serif font).
+    - **Font Weight**: 600 (semi-bold).
+    - **Font Size**: Exactly match the font size of the original text being replaced.
+    - **Color**: #222222 (a dark, neutral grey).
+    - **Letter Spacing**: 0.5px.
+    - **Text Transform**: Uppercase.
+    - **Alignment**: Left-aligned to the original text's starting position.
+5.  **Crucially, you must not alter any other part of the image.** The background, surrounding text, and document quality must remain identical to the original. The final image must be a perfect, high-quality copy with only the specified text replaced according to the styling rules.
 
 **PII to replace:**
 ${redactionInstructions}

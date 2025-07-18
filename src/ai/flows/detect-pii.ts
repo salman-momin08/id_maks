@@ -22,7 +22,7 @@ const DetectPiiInputSchema = z.object({
 export type DetectPiiInput = z.infer<typeof DetectPiiInputSchema>;
 
 const PiiDetectionResultSchema = z.object({
-  type: z.string().describe('The type of PII detected (e.g., name, address, date of birth, aadhaar number, phone number, email address).'),
+  type: z.string().describe('The type of PII detected (e.g., Full Name, Address, Date of Birth, Aadhaar Number, Phone Number).'),
   value: z.string().describe('The detected PII value.'),
   bounding_box: z.object({
     x1: z.number(),
@@ -47,19 +47,23 @@ const detectPiiPrompt = ai.definePrompt({
   name: 'detectPiiPrompt',
   input: {schema: DetectPiiInputSchema},
   output: {schema: DetectPiiOutputSchema},
-  prompt: `You are an expert in detecting Personally Identifiable Information (PII) in images of documents. 
+  prompt: `You are a highly specialized data protection officer with expertise in Optical Character Recognition (OCR) and Personally Identifiable Information (PII) detection from document images.
 
-  Given an image of a document, identify and extract all PII elements, including but not limited to:
+  Your task is to meticulously analyze the provided document image and identify the following specific PII types:
   - Full Name
   - Address
   - Date of Birth
-  - Aadhaar Number (or similar national ID number)
+  - Aadhaar Number
   - Phone Number
-  - Email Address (if present)
 
-  For each detected PII element, determine its type and value. If possible, estimate the bounding box coordinates (x1, y1, x2, y2) of the PII element within the image. Return the results in a JSON array format as described in the output schema.
+  For each piece of PII you find:
+  1.  Extract the exact text value.
+  2.  Identify its type from the list above.
+  3.  Determine the precise bounding box coordinates (x1, y1, x2, y2) that enclose the PII on the image. The coordinates must be as accurate as possible.
 
-  Here is the document image: {{media url=photoDataUri}}
+  Return your findings as a structured JSON array according to the output schema. If no PII is found, return an empty array.
+
+  Document Image for Analysis: {{media url=photoDataUri}}
   `,
 });
 

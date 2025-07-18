@@ -1,4 +1,3 @@
-// mask-pii.ts
 'use server';
 /**
  * @fileOverview This file defines a Genkit flow for detecting and masking PII in images.
@@ -10,8 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import wav from 'wav';
+import {detectPii} from './detect-pii';
 
 const MaskPIIInputSchema = z.object({
   photoDataUri: z
@@ -25,42 +23,13 @@ export type MaskPIIInput = z.infer<typeof MaskPIIInputSchema>;
 const MaskPIIOutputSchema = z.object({
   maskedPhotoDataUri: z
     .string()
-    .describe("The masked photo, as a data URI."),
+    .describe('The masked photo, as a data URI.'),
 });
 export type MaskPIIOutput = z.infer<typeof MaskPIIOutputSchema>;
 
 export async function maskPII(input: MaskPIIInput): Promise<MaskPIIOutput> {
   return maskPIIFlow(input);
 }
-
-const piiDetectionPrompt = ai.definePrompt({
-  name: 'piiDetectionPrompt',
-  input: {schema: MaskPIIInputSchema},
-  output: {schema: z.object({
-    piiRegions: z.array(z.object({
-      x: z.number(),
-      y: z.number(),
-      width: z.number(),
-      height: z.number(),
-      type: z.string(),
-    })).describe('Array of PII regions with coordinates and type.')
-  })},
-  prompt: `You are an expert at detecting Personally Identifiable Information (PII) in images of documents.
-
-  Given the following image of a document, identify the regions containing PII.  PII includes full names, addresses, dates of birth, Aadhaar numbers, phone numbers, and email addresses.
-
-  Return a JSON array of bounding box coordinates for each PII region detected in the following format:
-  [{
-    "x": x coordinate of the top-left corner,
-    "y": y coordinate of the top-left corner,
-    "width": width of the bounding box,
-    "height": height of the bounding box,
-    "type": type of PII detected (e.g., name, address, dob, aadhaar, phone, email)
-  }]
-
-  Image: {{media url=photoDataUri}}
-  `,
-});
 
 const maskPIIFlow = ai.defineFlow(
   {
@@ -69,39 +38,51 @@ const maskPIIFlow = ai.defineFlow(
     outputSchema: MaskPIIOutputSchema,
   },
   async input => {
-    // 1. Detect PII regions using the piiDetectionPrompt
-    const detectionResult = await piiDetectionPrompt(input);
+    // 1. Detect PII regions using the existing detectPii flow
+    const piiResult = await detectPii(input);
+    const piiElements = piiResult.piiElements;
 
-    //console.log("detectionResult", detectionResult);
+    if (!piiElements || piiElements.length === 0) {
+      // No PII found, return original image
+      return {maskedPhotoDataUri: input.photoDataUri};
+    }
+    
+    // 2. Construct a detailed prompt for the image generation model
+    const redactionInstructions = piiElements
+        .filter(p => p.bounding_box)
+        .map(p => `- A ${p.type} located at bounding box (x1: ${p.bounding_box!.x1}, y1: ${p.bounding_box!.y1}, x2: ${p.bounding_box!.x2}, y2: ${p.bounding_box!.y2}).`)
+        .join('\n');
 
-    // 2. Generate a prompt to mask the detected PII regions.
-    const maskPrompt = `Here is the original image: {{media url=photoDataUri}}.  Here are the PII regions that must be blacked out:
-    ${JSON.stringify(detectionResult.output?.piiRegions)}.
+    const prompt = `
+You are an expert image editor specializing in high-fidelity document redaction.
+Your task is to edit the provided image to mask specific areas containing Personally Identifiable Information (PII).
 
-    Return the data URI of the masked image.
-    `
-    //console.log("maskPrompt", maskPrompt);
+**Instructions:**
+1.  Analyze the user-provided image.
+2.  Cover the areas defined by the following bounding box coordinates with solid, opaque, black rectangles.
+3.  Do NOT alter any other part of the image. The final image must be a perfect, high-quality copy of the original with only the specified areas redacted.
+4.  Do not add any text, watermarks, or other artifacts. The redaction must be clean and precise.
 
+**PII to redact:**
+${redactionInstructions}
+`;
+
+    // 3. Use an image generation model to perform the redaction
     const {media} = await ai.generate({
-      // IMPORTANT: ONLY the googleai/gemini-2.0-flash-preview-image-generation model is able to generate images. You MUST use exactly this model to generate images.
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
-
-      // simple prompt
-      //prompt: 'Generate an image of a cat',
-      // OR, existing images can be provided in-context for editing, character reuse, etc.
       prompt: [
         {media: {url: input.photoDataUri}},
-        {text: maskPrompt},
+        {text: prompt},
       ],
-
       config: {
-        responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
+        responseModalities: ['IMAGE'],
       },
     });
 
-    //console.log(media.url);
-    return {maskedPhotoDataUri: media.url!};
+    if (!media?.url) {
+        throw new Error("Image generation failed to return a masked image.");
+    }
+
+    return {maskedPhotoDataUri: media.url};
   }
 );
-
-

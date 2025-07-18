@@ -59,7 +59,13 @@ const detectPiiPrompt = ai.definePrompt({
   For each piece of PII you find:
   1.  Extract the exact text value.
   2.  Identify its type from the list above.
-  3.  Determine the precise bounding box coordinates (x1, y1, x2, y2) that enclose the PII on the image. The coordinates must be as accurate as possible.
+  3.  Determine the precise bounding box coordinates (x1, y1, x2, y2) that enclose the PII on the image.
+
+  **SPECIAL INSTRUCTIONS for Aadhaar Numbers:**
+  - An Aadhaar number is a 12-digit number, often formatted as XXXX XXXX XXXX.
+  - When you detect an Aadhaar Number, you must only identify the **first 8 digits** as the value to be redacted.
+  - The 'value' field in your output for an Aadhaar Number should contain only the first 8 digits.
+  - The 'bounding_box' for the Aadhaar Number should ONLY cover the area of these first 8 digits. The last 4 digits must be excluded from the bounding box and value.
 
   Return your findings as a structured JSON array according to the output schema. If no PII is found, return an empty array.
 

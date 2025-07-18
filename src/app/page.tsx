@@ -182,7 +182,7 @@ export default function Home() {
                         ))}
                       </div>
                     )}
-                    {!isLoading && piiDetections.length === 0 && !isLoading && (
+                    {!isLoading && piiDetections.length === 0 && (
                       <p className="text-muted-foreground">No PII was detected in this image.</p>
                     )}
                   </CardContent>

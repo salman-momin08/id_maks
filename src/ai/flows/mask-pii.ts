@@ -75,7 +75,7 @@ ${redactionInstructions}
         {text: prompt},
       ],
       config: {
-        responseModalities: ['IMAGE'],
+        responseModalities: ['IMAGE', 'TEXT'],
       },
     });
 

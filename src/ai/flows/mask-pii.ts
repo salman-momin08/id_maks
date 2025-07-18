@@ -50,20 +50,20 @@ const maskPIIFlow = ai.defineFlow(
     // 2. Construct a detailed prompt for the image generation model
     const redactionInstructions = piiElements
         .filter(p => p.bounding_box)
-        .map(p => `- A ${p.type} located at bounding box (x1: ${p.bounding_box!.x1}, y1: ${p.bounding_box!.y1}, x2: ${p.bounding_box!.x2}, y2: ${p.bounding_box!.y2}).`)
+        .map(p => `- The ${p.type} "${p.value}" located within bounding box (x1: ${p.bounding_box!.x1}, y1: ${p.bounding_box!.y1}, x2: ${p.bounding_box!.x2}, y2: ${p.bounding_box!.y2}).`)
         .join('\n');
 
     const prompt = `
-You are an expert image editor specializing in high-fidelity document redaction.
-Your task is to edit the provided image to mask specific areas containing Personally Identifiable Information (PII).
+You are an expert document editor with perfect accuracy. Your task is to edit the provided image to redact Personally Identifiable Information (PII) by replacing it with 'X' characters.
 
 **Instructions:**
-1.  Analyze the user-provided image.
-2.  Cover the areas defined by the following bounding box coordinates with solid, opaque, black rectangles.
-3.  Do NOT alter any other part of the image. The final image must be a perfect, high-quality copy of the original with only the specified areas redacted.
-4.  Do not add any text, watermarks, or other artifacts. The redaction must be clean and precise.
+1.  Analyze the user-provided image carefully.
+2.  For each piece of PII listed below, locate the exact text within its specified bounding box.
+3.  **Replace the original text with a sequence of 'X's.** For example, a name like "John Doe" should become "XXXX XXX" and a number like "1234 5678 9012" should become "XXXX XXXX XXXX". Match the character count and spacing of the original text as closely as possible.
+4.  The replacement text should be in a standard, clean, black font that blends with the document.
+5.  **Crucially, you must not alter any other part of the image.** The background, surrounding text, and document quality must remain identical to the original. The final image must be a perfect, high-quality copy with only the specified text replaced.
 
-**PII to redact:**
+**PII to replace:**
 ${redactionInstructions}
 `;
 

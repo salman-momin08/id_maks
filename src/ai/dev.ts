@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/mask-pii.ts';
+import '@/ai/flows/detect-pii.ts';

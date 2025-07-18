@@ -22,7 +22,7 @@ const DetectPiiInputSchema = z.object({
 export type DetectPiiInput = z.infer<typeof DetectPiiInputSchema>;
 
 const PiiDetectionResultSchema = z.object({
-  type: z.string().describe('The type of PII detected (e.g., Full Name, Address, Date of Birth, Aadhaar Number, Phone Number).'),
+  type: z.string().describe('The type of PII detected (e.g., Full Name, Address, Date of Birth, Aadhaar Number, Phone Number, Email).'),
   value: z.string().describe('The detected PII value.'),
   bounding_box: z.object({
     x1: z.number(),
@@ -55,17 +55,18 @@ const detectPiiPrompt = ai.definePrompt({
   - Date of Birth
   - Aadhaar Number
   - Phone Number
+  - Email
 
   For each piece of PII you find:
   1.  Extract the exact text value.
   2.  Identify its type from the list above.
   3.  Determine the precise bounding box coordinates (x1, y1, x2, y2) that enclose the PII on the image.
 
-  **SPECIAL INSTRUCTIONS for Aadhaar Numbers:**
+  **CRITICAL INSTRUCTIONS for Aadhaar Numbers:**
   - An Aadhaar number is a 12-digit number, often formatted as XXXX XXXX XXXX.
-  - When you detect an Aadhaar Number, you must only identify the **first 8 digits** as the value to be redacted.
-  - The 'value' field in your output for an Aadhaar Number should contain only the first 8 digits.
-  - The 'bounding_box' for the Aadhaar Number should ONLY cover the area of these first 8 digits. The last 4 digits must be excluded from the bounding box and value.
+  - When you detect an Aadhaar Number, you MUST identify ONLY THE FIRST 8 DIGITS as the PII to be redacted.
+  - The 'value' field in your output for an Aadhaar Number MUST contain ONLY the first 8 digits.
+  - The 'bounding_box' for the Aadhaar Number MUST ONLY cover the area of these first 8 digits. The last 4 digits must be excluded from the bounding box and value. This is a strict requirement.
 
   Return your findings as a structured JSON array according to the output schema. If no PII is found, return an empty array.
 

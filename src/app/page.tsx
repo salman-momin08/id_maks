@@ -2,21 +2,14 @@
 
 import { useState, useRef, type ChangeEvent } from 'react';
 import Image from 'next/image';
-import { detectPii, type DetectPiiOutput } from '@/ai/flows/detect-pii';
-import { redactAadhaar } from '@/ai/flows/redact-aadhaar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, Download, Loader2, FileImage, X } from 'lucide-react';
 import { ImageDisplay } from '@/components/image-display';
-import { Badge } from '@/components/ui/badge';
-
-type PiiDetection = DetectPiiOutput['piiElements'][0];
 
 export default function Home() {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [maskedImage, setMaskedImage] = useState<string | null>(null);
-  const [piiDetections, setPiiDetections] = useState<PiiDetection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -33,49 +26,29 @@ export default function Home() {
         return;
       }
       const reader = new FileReader();
+      reader.onloadstart = () => setIsLoading(true);
       reader.onload = (e) => {
         const dataUri = e.target?.result as string;
         setOriginalImage(dataUri);
-        processImage(dataUri);
+        setIsLoading(false);
+      };
+      reader.onerror = () => {
+        setIsLoading(false);
+        toast({
+          title: 'File Error',
+          description: 'Failed to read the file.',
+          variant: 'destructive',
+        });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const processImage = async (dataUri: string) => {
-    setIsLoading(true);
-    setMaskedImage(null);
-    setPiiDetections([]);
-    try {
-      // Run detection and redaction
-      const [piiResult, redactedResult] = await Promise.all([
-        detectPii({ photoDataUri: dataUri }),
-        redactAadhaar({ photoDataUri: dataUri }),
-      ]);
-
-      if (piiResult?.piiElements) {
-        setPiiDetections(piiResult.piiElements);
-      }
-      if (redactedResult?.redactedPhotoDataUri) {
-        setMaskedImage(redactedResult.redactedPhotoDataUri);
-      }
-    } catch (error) {
-      console.error('Error processing image:', error);
-      toast({
-        title: 'Processing Error',
-        description: 'Failed to redact PII. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleDownload = () => {
-    if (!maskedImage) return;
+    if (!originalImage) return;
     const link = document.createElement('a');
-    link.href = maskedImage;
-    link.download = 'redacted-aadhaar.png';
+    link.href = originalImage;
+    link.download = 'uploaded-image.png';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -83,8 +56,6 @@ export default function Home() {
   
   const handleReset = () => {
     setOriginalImage(null);
-    setMaskedImage(null);
-    setPiiDetections([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -107,12 +78,12 @@ export default function Home() {
                 </div>
                 <CardTitle className="font-headline text-2xl">Upload Your Document</CardTitle>
                 <CardDescription>
-                  Drag & drop an image or click to select a file. We'll automatically find and mask sensitive information.
+                  Drag & drop an image or click to select a file to get started.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button size="lg" onClick={() => fileInputRef.current?.click()}>
-                  <UploadCloud className="mr-2" />
+                <Button size="lg" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 animate-spin" /> : <UploadCloud className="mr-2" />}
                   Upload Image
                 </Button>
                 <input
@@ -131,78 +102,35 @@ export default function Home() {
               <Card className="overflow-hidden">
                 <CardHeader>
                   <CardTitle>Original Image</CardTitle>
-                  <CardDescription>PII detections are highlighted in green.</CardDescription>
+                  <CardDescription>This is the image you uploaded.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ImageDisplay src={originalImage} alt="Original document" detections={piiDetections} />
+                  <ImageDisplay src={originalImage} alt="Original document" />
                 </CardContent>
               </Card>
 
               <div className="space-y-8">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Redacted Image</CardTitle>
-                    <CardDescription>Sensitive information has been blurred or replaced.</CardDescription>
+                    <CardTitle>Actions</CardTitle>
+                    <CardDescription>Actions you can perform on the image.</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    {isLoading && (
-                       <div className="aspect-video w-full flex flex-col items-center justify-center bg-muted/50 rounded-lg">
-                         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4"/>
-                         <p className="text-muted-foreground">Scanning and redacting PII...</p>
-                       </div>
-                    )}
-                    {!isLoading && maskedImage && (
-                      <Image
-                        src={maskedImage}
-                        alt="Redacted document"
-                        width={800}
-                        height={600}
-                        className="w-full h-auto rounded-lg border"
-                        data-ai-hint="document id redacted"
-                      />
-                    )}
-                     {!isLoading && !maskedImage && (
-                       <div className="aspect-video w-full flex items-center justify-center bg-destructive/10 text-destructive rounded-lg">
-                         <p>Could not generate redacted image.</p>
-                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Detected Information</CardTitle>
-                    <CardDescription>The following PII types were found.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading && <p className="text-muted-foreground">Detecting PII...</p>}
-                    {!isLoading && piiDetections.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {piiDetections.map((p, i) => (
-                          <Badge key={i} variant="secondary">{p.type}</Badge>
-                        ))}
-                      </div>
-                    )}
-                    {!isLoading && piiDetections.length === 0 && (
-                      <p className="text-muted-foreground">No PII was detected in this image.</p>
-                    )}
+                  <CardContent className="flex flex-col gap-4">
+                     <p className="text-sm text-muted-foreground">
+                       Connect this to your backend to process the image.
+                     </p>
+                      <Button onClick={handleDownload}>
+                        <Download className="mr-2"/>
+                        Download Image
+                      </Button>
+                      <Button variant="outline" onClick={handleReset}>
+                        <X className="mr-2"/>
+                        Upload Another
+                      </Button>
                   </CardContent>
                 </Card>
               </div>
 
-            </div>
-            <div className="flex justify-center gap-4 mt-8">
-              <Button variant="outline" onClick={handleReset}>
-                <X className="mr-2"/>
-                Scan Another
-              </Button>
-              <Button onClick={handleDownload} disabled={!maskedImage || isLoading}>
-                {isLoading ? (
-                  <Loader2 className="mr-2 animate-spin"/>
-                ) : (
-                  <Download className="mr-2"/>
-                )}
-                Download Redacted Image
-              </Button>
             </div>
           </div>
         )}
